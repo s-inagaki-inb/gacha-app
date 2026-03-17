@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ガチャ | LINEミニアプリ デモ</title>
+
+  <!-- ★ LIFF SDK: 実際のミニアプリではここで読み込む -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --line-green: #06C755;
+      --line-green-dark: #05a849;
+      --bg: #0d0d1c;
+      --surface: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.10);
+      --gold: #FFD700;
+      --purple: #c084fc;
+      --blue: #60a5fa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Zen Maru Gothic', sans-serif;
+      background: var(--bg);
+      color: #fff;
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ───── Stars bg ───── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(1px 1px at 15% 25%, rgba(255,255,255,.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 65% 8%,  rgba(255,255,255,.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 82% 44%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 42% 78%, rgba(255,255,255,.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 8%  65%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 91% 18%, rgba(255,255,255,.6) 0%, transparent 100%),
+        radial-gradient(1px 1px at 53% 52%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 28% 12%, rgba(255,255,255,.4) 0%, transparent 100%),
+        radial-gradient(1px 1px at 74% 88%, rgba(255,255,255,.3) 0%, transparent 100%);
+    }
+
+    /* ───── Layout ───── */
+    .app { position: relative; z-index: 1; max-width: 430px; margin: 0 auto; padding: 0 16px 32px; }
+
+    /* ───── Header ───── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 8px; }
+    .line-badge {
+      background: var(--line-green); color: #fff;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      padding: 3px 8px; border-radius: 6px;
+    }
+    .header-title { font-size: 15px; font-weight: 700; }
+
+    /* ───── User card ───── */
+    .user-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 20px;
+    }
+    .user-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg, #2a2a5a, #1a1a3a);
+      border: 2px solid var(--line-green);
+      overflow: hidden; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .user-info { flex: 1; }
+    .user-name { font-size: 14px; font-weight: 700; }
+    .user-sub { font-size: 11px; opacity: .45; margin-top: 2px; }
+    .ticket-pill {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,215,0,.12);
+      border: 1px solid rgba(255,215,0,.3);
+      border-radius: 20px; padding: 5px 12px;
+      font-size: 13px; font-weight: 700; color: var(--gold);
+      white-space: nowrap;
+    }
+
+    /* ───── Gacha machine ───── */
+    .machine-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; margin-bottom: 20px;
+    }
+    .machine {
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 32%, #2a2a4a, #080814);
+      border: 3px solid rgba(255,255,255,.12);
+      box-shadow: 0 0 40px rgba(6,199,85,.15), inset 0 0 60px rgba(0,0,0,.6);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none;
+      transition: transform .1s;
+      position: relative; overflow: hidden;
+    }
+    .machine::before {
+      content: '';
+      position: absolute; inset: 10px; border-radius: 50%;
+      background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.07), transparent 60%);
+      pointer-events: none;
+    }
+    .machine:active { transform: scale(.95); }
+    .machine-emoji {
+      font-size: 68px; line-height: 1;
+      filter: drop-shadow(0 0 10px rgba(255,255,255,.25));
+      transition: transform .2s, opacity .2s;
+    }
+    .machine-hint { font-size: 11px; opacity: .38; letter-spacing: .5px; }
+
+    /* ───── Result card ───── */
+    .result-area { margin-bottom: 20px; min-height: 100px; }
+    .result-placeholder {
+      text-align: center; padding: 28px 0;
+      font-size: 13px; opacity: .3;
+    }
+    .result-card {
+      border-radius: 20px; padding: 18px 16px;
+      display: flex; align-items: center; gap: 14px;
+      position: relative; overflow: hidden;
+      animation: pop .45s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    .result-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.07), transparent);
+      pointer-events: none;
+    }
+    .result-card.ssr {
+      background: linear-gradient(135deg, rgba(255,160,0,.18), rgba(255,80,0,.12));
+      border: 2px solid rgba(255,165,0,.55);
+      box-shadow: 0 0 30px rgba(255,165,0,.25);
+    }
+    .result-card.sr {
+      background: linear-gradient(135deg, rgba(180,100,255,.18), rgba(100,60,200,.12));
+      border: 2px solid rgba(180,100,255,.45);
+    }
+    .result-card.r {
+      background: linear-gradient(135deg, rgba(0,140,255,.14), rgba(0,80,200,.1));
+      border: 2px solid rgba(0,150,255,.28);
+    }
+    .result-card.n {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .res-emoji { font-size: 52px; flex-shrink: 0; line-height: 1; }
+    .res-info { flex: 1; }
+    .res-rarity {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px; margin-bottom: 3px;
+    }
+    .result-card.ssr .res-rarity { color: #FFA500; }
+    .result-card.sr  .res-rarity { color: var(--purple); }
+    .result-card.r   .res-rarity { color: var(--blue); }
+    .result-card.n   .res-rarity { color: rgba(255,255,255,.35); }
+    .res-name { font-size: 17px; font-weight: 900; }
+    .res-desc { font-size: 11px; opacity: .5; margin-top: 3px; }
+    .res-badge {
+      position: absolute; top: 11px; right: 11px;
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      padding: 2px 9px; border-radius: 20px;
+    }
+    .result-card.ssr .res-badge { background: rgba(255,165,0,.25); color: #FFA500; }
+    .result-card.sr  .res-badge { background: rgba(180,100,255,.25); color: var(--purple); }
+    .result-card.r   .res-badge { background: rgba(0,150,255,.18); color: var(--blue); }
+    .result-card.n   .res-badge { background: rgba(255,255,255,.07); color: rgba(255,255,255,.35); }
+
+    /* ───── Share button ───── */
+    .share-btn {
+      width: 100%; padding: 12px;
+      border: 1px solid var(--line-green);
+      border-radius: 12px; background: transparent;
+      color: var(--line-green); font-family: inherit;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: all .15s; margin-top: 10px;
+      display: none;
+    }
+    .share-btn.show { display: block; }
+    .share-btn:hover { background: rgba(6,199,85,.1); }
+
+    /* ───── Main button ───── */
+    .gacha-btn {
+      width: 100%; padding: 17px;
+      border: none; border-radius: 16px;
+      background: var(--line-green); color: #fff;
+      font-family: inherit; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: all .15s;
+      box-shadow: 0 4px 20px rgba(6,199,85,.3);
+      position: relative; overflow: hidden; margin-bottom: 10px;
+    }
+    .gacha-btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,.15), transparent);
+      pointer-events: none;
+    }
+    .gacha-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(6,199,85,.45); }
+    .gacha-btn:active:not(:disabled) { transform: none; }
+    .gacha-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-sub { font-size: 11px; opacity: .7; margin-top: 2px; }
+
+    /* ───── History ───── */
+    .history { margin-top: 20px; }
+    .section-title { font-size: 11px; letter-spacing: 2px; opacity: .35; margin-bottom: 10px; }
+    .history-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      font-size: 20px; padding: 6px 10px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px;
+      animation: pop .3s ease-out forwards;
+    }
+    .chip.ssr { border-color: rgba(255,165,0,.4); background: rgba(255,165,0,.08); }
+    .chip.sr  { border-color: rgba(180,100,255,.3); background: rgba(180,100,255,.07); }
+
+    /* ───── Notice ───── */
+    .notice {
+      background: rgba(6,199,85,.08); border: 1px solid rgba(6,199,85,.25);
+      border-radius: 12px; padding: 12px 16px;
+      font-size: 12px; color: rgba(255,255,255,.65); text-align: center;
+      display: none; margin-top: 4px;
+    }
+    .notice.show { display: block; }
+
+    /* ───── Code panel ───── */
+    .code-section { margin-top: 28px; }
+    .code-toggle {
+      width: 100%; padding: 10px 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; color: rgba(255,255,255,.55);
+      font-family: inherit; font-size: 12px; cursor: pointer;
+      text-align: left; transition: all .15s;
+    }
+    .code-toggle:hover { color: rgba(255,255,255,.8); border-color: rgba(255,255,255,.2); }
+    .code-block {
+      display: none; margin-top: 8px;
+      background: rgba(0,0,0,.4); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px;
+      font-family: 'Courier New', monospace; font-size: 11px;
+      line-height: 1.7; color: rgba(255,255,255,.75);
+      overflow-x: auto; white-space: pre;
+    }
+    .code-block.open { display: block; }
+    .kw { color: #c084fc; }
+    .str { color: #86efac; }
+    .cmt { color: rgba(255,255,255,.3); }
+    .fn { color: #60a5fa; }
+
+    /* ───── Confetti ───── */
+    .confetti-layer { position: fixed; inset: 0; pointer-events: none; z-index: 999; overflow: hidden; }
+    .conf {
+      position: absolute; width: 8px; height: 8px; border-radius: 2px;
+      animation: fall 1.2s ease-in forwards;
+    }
+
+    /* ───── Animations ───── */
+    @keyframes pop {
+      0%   { transform: scale(.3) translateY(16px); opacity: 0; }
+      60%  { transform: scale(1.07) translateY(-3px); opacity: 1; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+    @keyframes fall {
+      0%   { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(90px) rotate(720deg); opacity: 0; }
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0) rotate(0deg); }
+      20% { transform: translateX(-8px) rotate(-3deg); }
+      40% { transform: translateX(8px) rotate(3deg); }
+      60% { transform: translateX(-5px) rotate(-2deg); }
+      80% { transform: translateX(5px) rotate(2deg); }
+    }
+    @keyframes glow {
+      0%,100% { box-shadow: 0 0 40px rgba(6,199,85,.15), inset 0 0 60px rgba(0,0,0,.6); }
+      50%      { box-shadow: 0 0 80px rgba(6,199,85,.5), 0 0 120px rgba(6,199,85,.15), inset 0 0 60px rgba(0,0,0,.6); }
+    }
+    .shaking { animation: shake .45s ease-in-out; }
+    .glowing  { animation: glow .5s ease-in-out 3; }
+  </style>
+</head>
+<body>
+
+<div class="confetti-layer" id="confetti"></div>
+
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <span class="line-badge">LINE</span>
+      <span class="header-title">デイリーガチャ</span>
+    </div>
+  </div>
+
+  <!-- User card (LIFFでユーザー情報を表示) -->
+  <div class="user-card">
+    <div class="user-avatar" id="avatar">🙂</div>
+    <div class="user-info">
+      <div class="user-name" id="userName">読み込み中...</div>
+      <div class="user-sub" id="userId">LINE IDを取得中</div>
+    </div>
+    <div class="ticket-pill">🎟 <span id="ticketNum">5</span>枚</div>
+  </div>
+
+  <!-- Gacha machine -->
+  <div class="machine-wrap">
+    <div class="machine" id="machine" onclick="doGacha()">
+      <div class="machine-emoji" id="machineEmoji">🎰</div>
+    </div>
+    <div class="machine-hint">タップしてガチャを回す</div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-area" id="resultArea">
+    <div class="result-placeholder">上のガチャ機をタップしてね ✨</div>
+  </div>
+
+  <!-- Share button -->
+  <button class="share-btn" id="shareBtn" onclick="shareResult()">
+    📤　結果をLINEでシェアする
+  </button>
+
+  <!-- Main button -->
+  <button class="gacha-btn" id="gachaBtn" onclick="doGacha()">
+    <div>ガチャを回す</div>
+    <div class="btn-sub">ガチャチケット 1枚消費</div>
+  </button>
+
+  <div class="notice" id="notice">
+    チケットが0枚になりました。実際のミニアプリでは明日また補充されます 🎟
+  </div>
+
+  <!-- History -->
+  <div class="history" id="historySection" style="display:none">
+    <div class="section-title">これまでの結果</div>
+    <div class="history-chips" id="historyChips"></div>
+  </div>
+
+  <!-- Code panel -->
+  <div class="code-section">
+    <button class="code-toggle" onclick="toggleCode()">
+      📄 実際のLIFF実装コードを見る ▾
+    </button>
+    <div class="code-block" id="codeBlock"><span class="cmt">// ① index.html に LIFF SDK を読み込む</span>
+<span class="str">&lt;script src="https://static.line-scdn.net/liff/edge/2/sdk.js"&gt;&lt;/script&gt;</span>
+
+<span class="cmt">// ② アプリ起動時に LIFF を初期化する</span>
+<span class="kw">const</span> <span class="fn">LIFF_ID</span> = <span class="str">"YOUR_LIFF_ID"</span>; <span class="cmt">// Developersコンソールで取得</span>
+
+<span class="kw">async function</span> <span class="fn">initLiff</span>() {
+  <span class="kw">await</span> liff.<span class="fn">init</span>({ liffId: LIFF_ID });
+
+  <span class="cmt">// LINEでログインしていなければリダイレクト</span>
+  <span class="kw">if</span> (!liff.<span class="fn">isLoggedIn</span>()) {
+    liff.<span class="fn">login</span>();
+    <span class="kw">return</span>;
+  }
+
+  <span class="cmt">// ③ ユーザー情報を取得して表示</span>
+  <span class="kw">const</span> profile = <span class="kw">await</span> liff.<span class="fn">getProfile</span>();
+  document.<span class="fn">getElementById</span>(<span class="str">'userName'</span>).textContent = profile.displayName;
+  document.<span class="fn">getElementById</span>(<span class="str">'userId'</span>).textContent = <span class="str">`UID: ${profile.userId}`</span>;
+
+  <span class="cmt">// アバター画像を設定</span>
+  <span class="kw">const</span> avatarEl = document.<span class="fn">getElementById</span>(<span class="str">'avatar'</span>);
+  avatarEl.innerHTML = <span class="str">`&lt;img src="${profile.pictureUrl}"&gt;`</span>;
+}
+
+<span class="cmt">// ④ 結果をトークルームにシェアする</span>
+<span class="kw">async function</span> <span class="fn">shareResult</span>(item) {
+  <span class="kw">if</span> (!liff.<span class="fn">isApiAvailable</span>(<span class="str">'shareTargetPicker'</span>)) <span class="kw">return</span>;
+
+  <span class="kw">await</span> liff.<span class="fn">shareTargetPicker</span>([{
+    type: <span class="str">'flex'</span>,
+    altText: <span class="str">`ガチャで ${item.name} を引いた！`</span>,
+    contents: {
+      type: <span class="str">'bubble'</span>,
+      body: {
+        type: <span class="str">'box'</span>, layout: <span class="str">'vertical'</span>,
+        contents: [
+          { type: <span class="str">'text'</span>, text: item.emoji, size: <span class="str">'5xl'</span>, align: <span class="str">'center'</span> },
+          { type: <span class="str">'text'</span>, text: item.name, weight: <span class="str">'bold'</span>, align: <span class="str">'center'</span> },
+          { type: <span class="str">'text'</span>, text: <span class="str">`レアリティ: ${item.rarity.toUpperCase()}`</span>,
+            color: <span class="str">'#06C755'</span>, align: <span class="str">'center'</span> }
+        ]
+      }
+    }
+  }]);
+}
+
+<span class="fn">initLiff</span>(); <span class="cmt">// 起動</span></div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ─── Items ─── */
+const ITEMS = [
+  { rarity:'ssr', emoji:'👑', name:'伝説の王冠',   desc:'全ガチャ中でも最レア！', rate:3  },
+  { rarity:'ssr', emoji:'💎', name:'ダイヤモンド', desc:'輝きが違う。圧倒的存在感。', rate:2  },
+  { rarity:'sr',  emoji:'🦄', name:'ユニコーン',   desc:'幻のモンスター。', rate:8  },
+  { rarity:'sr',  emoji:'🌙', name:'月の精霊',     desc:'夜空に輝く神秘的な存在。', rate:7  },
+  { rarity:'sr',  emoji:'🔮', name:'魔法の水晶球', desc:'未来が見える…かも。', rate:5  },
+  { rarity:'r',   emoji:'⚔️', name:'鋼の剣',       desc:'しっかりした品質。', rate:15 },
+  { rarity:'r',   emoji:'🛡️', name:'守護の盾',     desc:'仲間を守る頼もしい盾。', rate:12 },
+  { rarity:'r',   emoji:'🏹', name:'エルフの弓',   desc:'遠距離攻撃が得意。', rate:8  },
+  { rarity:'n',   emoji:'🍎', name:'赤いリンゴ',   desc:'まあ、あるといいよね。', rate:15 },
+  { rarity:'n',   emoji:'🪨', name:'ただの石',     desc:'どこにでもある石ころ。', rate:14 },
+  { rarity:'n',   emoji:'🍄', name:'きのこ',       desc:'食べられるかどうかは不明。', rate:11 },
+];
+const RARITY_LABEL = { ssr:'★★★ SSR', sr:'★★ SR', r:'★ R', n:'N' };
+
+let tickets = 5, spinning = false, lastItem = null;
+const history = [];
+
+/* ─── LIFF init (デモ用モック) ─── */
+window.addEventListener('DOMContentLoaded', async () => {
+  const LIFF_ID = '2009500833-Vg0YsQ4L'; // ← 実際のLIFF IDに差し替える
+
+  try {
+    // 実際にLIFFが利用可能な環境では以下を有効化
+    // await liff.init({ liffId: LIFF_ID });
+    // if (!liff.isLoggedIn()) { liff.login(); return; }
+    // const profile = await liff.getProfile();
+    // document.getElementById('userName').textContent = profile.displayName;
+    // document.getElementById('userId').textContent  = 'UID: ' + profile.userId;
+    // const av = document.getElementById('avatar');
+    // av.innerHTML = `<img src="${profile.pictureUrl}">`;
+
+    // ── デモ用フォールバック ──
+    document.getElementById('userName').textContent = 'デモユーザー';
+    document.getElementById('userId').textContent   = '※ LINE外ブラウザでは実ID非表示';
+  } catch(e) {
+    document.getElementById('userName').textContent = 'デモユーザー';
+    document.getElementById('userId').textContent   = 'LIFF ID未設定';
+  }
+});
+
+/* ─── Weighted random ─── */
+function pickItem() {
+  const total = ITEMS.reduce((s,i) => s + i.rate, 0);
+  let r = Math.random() * total;
+  for (const item of ITEMS) { r -= item.rate; if (r <= 0) return item; }
+  return ITEMS[ITEMS.length - 1];
+}
+
+/* ─── Confetti ─── */
+function spawnConfetti(n, colors) {
+  const layer = document.getElementById('confetti');
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('div');
+    el.className = 'conf';
+    el.style.cssText = `
+      left:${Math.random()*100}%;
+      top:${Math.random()*25}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-delay:${Math.random()*.4}s;
+      animation-duration:${.9+Math.random()*.6}s;
+      transform:rotate(${Math.random()*360}deg);
+    `;
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+  }
+}
+
+/* ─── Gacha ─── */
+async function doGacha() {
+  if (spinning || tickets <= 0) return;
+  spinning = true;
+  tickets--;
+  document.getElementById('ticketNum').textContent = tickets;
+  document.getElementById('gachaBtn').disabled = true;
+  document.getElementById('shareBtn').classList.remove('show');
+  document.getElementById('resultArea').innerHTML = '';
+
+  const machine = document.getElementById('machine');
+  const emoji   = document.getElementById('machineEmoji');
+
+  machine.classList.add('shaking', 'glowing');
+
+  // スピン演出
+  const spinList = ['🌀','⚡','✨','💫','🌟','🎲'];
+  let si = 0;
+  const iv = setInterval(() => { emoji.textContent = spinList[si++ % spinList.length]; }, 110);
+
+  await delay(650);
+  clearInterval(iv);
+  machine.classList.remove('shaking', 'glowing');
+
+  const item = pickItem();
+  lastItem = item;
+  emoji.textContent = item.emoji;
+
+  // コンフェッティ
+  if (item.rarity === 'ssr') spawnConfetti(45, ['#FFD700','#FFA500','#FF6B35','#fff','#FFE082']);
+  else if (item.rarity === 'sr') spawnConfetti(22, ['#c084fc','#a855f7','#fff','#e9d5ff']);
+
+  await delay(200);
+
+  // 結果カード
+  const card = document.createElement('div');
+  card.className = `result-card ${item.rarity}`;
+  card.innerHTML = `
+    <div class="res-emoji">${item.emoji}</div>
+    <div class="res-info">
+      <div class="res-rarity">${RARITY_LABEL[item.rarity]}</div>
+      <div class="res-name">${item.name}</div>
+      <div class="res-desc">${item.desc}</div>
+    </div>
+    <div class="res-badge">${item.rarity.toUpperCase()}</div>
+  `;
+  document.getElementById('resultArea').appendChild(card);
+  document.getElementById('shareBtn').classList.add('show');
+
+  // 履歴
+  history.unshift(item);
+  if (history.length > 14) history.pop();
+  const sec   = document.getElementById('historySection');
+  const chips = document.getElementById('historyChips');
+  sec.style.display = 'block';
+  chips.innerHTML = history.map(h =>
+    `<div class="chip ${h.rarity}" title="${h.name}">${h.emoji}</div>`
+  ).join('');
+
+  if (tickets <= 0) {
+    document.getElementById('notice').classList.add('show');
+  } else {
+    document.getElementById('gachaBtn').disabled = false;
+  }
+
+  spinning = false;
+}
+
+/* ─── Share (LIFF shareTargetPicker) ─── */
+async function shareResult() {
+  if (!lastItem) return;
+  const item = lastItem;
+  const rarityColor = { ssr:'#FFA500', sr:'#c084fc', r:'#60a5fa', n:'#aaaaaa' };
+
+  try {
+    // LINE環境のみ動作
+    if (typeof liff !== 'undefined' && liff.isApiAvailable('shareTargetPicker')) {
+      await liff.shareTargetPicker([{
+        type: 'flex',
+        altText: `ガチャで「${item.name}」を引いた！`,
+        contents: {
+          type: 'bubble',
+          size: 'kilo',
+          body: {
+            type: 'box', layout: 'vertical', spacing: 'md',
+            contents: [
+              { type: 'text', text: item.emoji, size: '5xl', align: 'center' },
+              { type: 'text', text: item.name,  weight: 'bold', size: 'xl', align: 'center' },
+              { type: 'text', text: RARITY_LABEL[item.rarity],
+                color: rarityColor[item.rarity], align: 'center', size: 'sm' },
+              { type: 'text', text: item.desc, color: '#888888', align: 'center', size: 'xs', wrap: true }
+            ]
+          }
+        }
+      }]);
+    } else {
+      alert('シェア機能はLINEアプリ内でのみ動作します。\n\n実際のミニアプリでは\nliff.shareTargetPicker() で\nトークルームにFlexメッセージを送信できます！');
+    }
+  } catch(e) {
+    console.error('share error:', e);
+  }
+}
+
+/* ─── Code toggle ─── */
+function toggleCode() {
+  document.getElementById('codeBlock').classList.toggle('open');
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
